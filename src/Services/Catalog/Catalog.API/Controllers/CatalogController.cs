@@ -5,6 +5,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Catalog.API.Entities;
 using Catalog.API.Repositories;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -55,7 +56,8 @@ namespace Catalog.API.Controllers
             return Ok(products);
         }
         [HttpPost]
-        [ProducesResponseType(typeof(Product),(int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(Product),(int)HttpStatusCode.Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<Product>> CreateProduct([FromBody]Product product)
         {
             await _repository.CreateProduct(product);
