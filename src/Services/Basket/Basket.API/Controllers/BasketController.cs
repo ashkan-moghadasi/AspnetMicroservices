@@ -4,9 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using AutoMapper;
 using Basket.API.Entities;
 using Basket.API.GrpcServices;
 using Basket.API.Repositories;
+using EventBus.Messages.Events;
+using MassTransit;
 
 namespace Basket.API.Controllers
 {
@@ -16,21 +19,21 @@ namespace Basket.API.Controllers
     {
         private readonly IBasketRepository _repository;
         private readonly DiscountGrpcService _discountGrpcService;
-        public BasketController(IBasketRepository repository, DiscountGrpcService discountGrpcService)
+        private readonly IMapper _mapper;
+        private readonly IPublishEndpoint _publishEndpoint;
+        public BasketController(IBasketRepository repository, DiscountGrpcService discountGrpcService, IMapper mapper, IPublishEndpoint publishEndpoint)
         {
             _repository = repository??throw new ArgumentNullException(nameof(repository));
             _discountGrpcService = discountGrpcService ?? throw new ArgumentNullException(nameof(discountGrpcService));
+            _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+            _publishEndpoint = publishEndpoint ?? throw  new ArgumentNullException(nameof(publishEndpoint));
         }
 
         [HttpGet("{userName}",Name = "GetBasket")]
         [ProducesResponseType(typeof(ShoppingCart),(int)HttpStatusCode.OK)]
         public async Task<ActionResult<ShoppingCart>> GetBasket(string userName)
         {
-            var basket=await _repository.GetBasket(userName);
-            if (basket == null)
-            {
-                basket = new ShoppingCart(userName);
-            }
+            var basket=await _repository.GetBasket(userName) ?? new ShoppingCart(userName);
 
             return Ok(basket);
         }
@@ -53,6 +56,26 @@ namespace Basket.API.Controllers
         {
             await _repository.DeleteBasket(userName);
             return Ok();
+        }
+
+        [HttpPost]
+        [Route("[action]")]
+        [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+        [ProducesResponseType((int)HttpStatusCode.Accepted)]
+        public async Task<IActionResult> Checkout([FromBody] BasketCheckout basketCheckout)
+        {
+            var basket=await _repository.GetBasket(basketCheckout.UserName);
+            if (basket == null)
+            {
+                return BadRequest();
+            }
+
+            var checkoutEvent=_mapper.Map<BasketCheckoutEvent>(basketCheckout);
+            checkoutEvent.TotalPrice = basket.TotalPrice;
+            await _publishEndpoint.Publish(message: checkoutEvent);
+            
+            await _repository.DeleteBasket(basketCheckout.UserName);
+            return Accepted();
         }
     }
 }
