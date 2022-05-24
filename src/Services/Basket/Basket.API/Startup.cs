@@ -48,6 +48,7 @@ namespace Basket.API
                 config.UsingRabbitMq((ctx, cfg) =>
                 {
                     cfg.Host(Configuration["EventBusSettings:HostName"]);
+                    
                 });
             });
             services.AddMassTransitHostedService();

@@ -6,10 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using EventBus.Messages.Common;
+using MassTransit;
+using Ordering.API.EventBusConsumer;
 using Ordering.Application;
 using Ordering.Infrastructure;
 
@@ -29,6 +28,22 @@ namespace Ordering.API
         {
             services.AddApplicationServices();
             services.AddInfrastructureServices(Configuration);
+            
+            //Configure EventBus and MassTransit
+            services.AddMassTransit(conf => conf.UsingRabbitMq((context, cfg) =>
+                {
+                    cfg.Host(Configuration["EventBusSettings:HostName"]);
+                    cfg.ReceiveEndpoint(EventBusConstant.BasketCheckoutQueue,cfg=>
+                    {
+                        cfg.ConfigureConsumer<BasketCheckoutConsumer>(context);
+                    });
+                }
+            ));
+            services.AddMassTransitHostedService();
+
+            //Configure General Services
+            services.AddAutoMapper(typeof(Startup));
+
 
             services.AddControllers();
             services.AddSwaggerGen(c =>
