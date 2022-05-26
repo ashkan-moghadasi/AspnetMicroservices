@@ -28,27 +28,35 @@ namespace Ordering.API
         {
             services.AddApplicationServices();
             services.AddInfrastructureServices(Configuration);
-            
-            //Configure EventBus and MassTransit
-            services.AddMassTransit(conf => conf.UsingRabbitMq((context, cfg) =>
-                {
-                    cfg.Host(Configuration["EventBusSettings:HostName"]);
-                    cfg.ReceiveEndpoint(EventBusConstant.BasketCheckoutQueue,cfg=>
-                    {
-                        cfg.ConfigureConsumer<BasketCheckoutConsumer>(context);
-                    });
-                }
-            ));
-            services.AddMassTransitHostedService();
 
             //Configure General Services
             services.AddAutoMapper(typeof(Startup));
+            services.AddScoped<BasketCheckoutConsumer>();
+
+            //Configure EventBus and MassTransit
+            services.AddMassTransit(conf =>
+            {
+                {
+                    conf.AddConsumer<BasketCheckoutConsumer>();
+                    conf.UsingRabbitMq((context, cfg) =>
+                        {
+                            cfg.Host(Configuration["EventBusSettings:HostName"]);
+                            cfg.ReceiveEndpoint(EventBusConstant.BasketCheckoutQueue,
+                                cfg =>
+                                {
+                                    cfg.ConfigureConsumer<BasketCheckoutConsumer>(context);
+                                });
+                        }
+                    );
+                }
+            });
+            services.AddMassTransitHostedService();
 
 
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "Ordering.API", Version = "v1" });
+                c.SwaggerDoc("v1", new OpenApiInfo {Title = "Ordering.API", Version = "v1"});
             });
         }
 
@@ -66,10 +74,7 @@ namespace Ordering.API
 
             app.UseAuthorization();
 
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapControllers();
-            });
+            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
         }
     }
 }
